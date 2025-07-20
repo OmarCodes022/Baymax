@@ -7,31 +7,55 @@ from gtts import gTTS
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
 
-# LANGCHAIN
-import getpass
-import os
 
-from langchain.chat_models import init_chat_model
-
-model = init_chat_model("gpt-4o-mini", model_provider="openai")
-model.invoke("Hello, world!")
+######################################################
 ######################################################
 
 
-def ask(prompt):
+# LangChain setup
+from langchain_openai import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain_community.chat_message_histories import FileChatMessageHistory
+from langchain.chains import ConversationChain
+from langchain_core.messages import SystemMessage
+from langchain.prompts import MessagesPlaceholder, ChatPromptTemplate
+
+# LLM
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
+
+# Persistent Memory
+history = FileChatMessageHistory(file_path="baymax_memory.json")
+memory = ConversationBufferMemory(
+    memory_key="history",
+    return_messages=True,
+    chat_memory=history
+)
+
+# Prompt with system role
+prompt = ChatPromptTemplate.from_messages([
+    SystemMessage(content="You are a friendly robot who acts like my best friend."),
+    MessagesPlaceholder(variable_name="history"),
+    ("human", "{input}")
+])
+
+# LangChain Conversation
+conversation = ConversationChain(
+    llm=llm,
+    memory=memory,
+    prompt=prompt,
+    input_key="input",
+    verbose=False
+)
+
+def ask(prompt: str) -> str:
     try:
-        response = openai.chat.completions.create(
-            #model="gpt-4o",
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a friendly robot who acts like my best friend."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return response.choices[0].message.content
+        return conversation.run(prompt)
     except Exception as e:
-        print("[!] Error from OpenAI:", e)
-        return "Sorry, I couldn't think of a reply. My brain needs charging."
+        print("[!] LangChain error:", e)
+        return "Sorry, I couldn’t generate a response."
+
+######################################################
+######################################################
 
 
 def chatgpt_speak(text):
